@@ -16,6 +16,7 @@ function loadOptions(options?: RetryOptions) {
         retries: 3,
         delay: 0,
         factor: 1,
+        onError: null,
     };
 
     if (!options) {
@@ -42,7 +43,9 @@ export default async function retry<T>(
     let attempts = 0;
     let returnError: Error;
 
-    if (maxRetries === 0) return operation;
+    if (maxRetries === 0) {
+        return operation;
+    }
 
     while (attempts < maxRetries) {
         try {
@@ -51,6 +54,10 @@ export default async function retry<T>(
         } catch (err) {
             returnError = err;
             attempts++;
+
+            if (options.onError) {
+                options.onError(err, attempts);
+            }
 
             if (attempts < maxRetries) {
                 if (delay > 0) {
