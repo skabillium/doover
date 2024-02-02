@@ -1,9 +1,11 @@
+/**
+ * TODO: Add "minTimeout" & "maxTimeout" options
+ */
 type RetryOptions = {
     retries?: number;
     delay?: number;
     factor?: number;
-    // minTimeout?: number;
-    // maxTimeout?: number;
+    onError?: (err: Error, attempt: number) => unknown;
 };
 
 const waitFor = (milliseconds: number) =>
@@ -20,11 +22,11 @@ function loadOptions(options?: RetryOptions) {
         return defaults;
     }
 
-    options.retries = options?.retries ?? 3;
-    options.delay = options?.delay ?? 0;
-    options.factor = options?.factor ?? 1;
-    // options.minTimeout = options?.minTimeout ?? null;
-    // options.maxTimeout = options?.maxTimeout ?? null;
+    for (let opt in defaults) {
+        if (!options[opt]) {
+            options[opt] = defaults[opt];
+        }
+    }
 
     return options;
 }
@@ -37,20 +39,22 @@ export default async function retry<T>(
 
     const maxRetries = options.retries;
     let { delay } = options;
-    let retries = 0;
+    let attempts = 0;
     let returnError: Error;
 
-    while (retries < maxRetries) {
+    if (maxRetries === 0) return operation;
+
+    while (attempts < maxRetries) {
         try {
             const result = await operation();
             return result;
         } catch (err) {
             returnError = err;
-            retries++;
+            attempts++;
 
-            if (retries < maxRetries) {
+            if (attempts < maxRetries) {
                 if (delay > 0) {
-                    if (retries !== 1) {
+                    if (attempts !== 1) {
                         delay = delay * options.factor;
                     }
 
