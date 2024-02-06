@@ -1,6 +1,3 @@
-/**
- * TODO: Add "minTimeout" & "maxTimeout" options
- */
 type RetryOptions = {
     retries?: number;
     delay?: number;
@@ -33,21 +30,22 @@ function loadOptions(options?: RetryOptions) {
 }
 
 export default async function retry<T>(
-    operation: () => Promise<T>,
+    operation: (bail?: (err?: Error) => void) => Promise<T>,
     opts?: RetryOptions,
 ) {
     const options = loadOptions(opts);
 
-    const maxRetries = options.retries;
+    const maxAttempts = options.retries + 1;
     let { delay } = options;
     let attempts = 0;
     let returnError: Error;
 
-    if (maxRetries === 0) {
+    // No need for running any extra logic if retries are set to 0
+    if (options.retries === 0) {
         return operation;
     }
 
-    while (attempts < maxRetries) {
+    while (attempts < maxAttempts) {
         try {
             const result = await operation();
             return result;
@@ -59,7 +57,7 @@ export default async function retry<T>(
                 options.onError(err, attempts);
             }
 
-            if (attempts < maxRetries) {
+            if (attempts < maxAttempts) {
                 if (delay > 0) {
                     if (attempts !== 1) {
                         delay = delay * options.factor;
