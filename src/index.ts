@@ -22,7 +22,7 @@ function loadOptions(options?: RetryOptions) {
         return defaults;
     }
 
-    for (let opt in defaults) {
+    for (const opt in defaults) {
         if (!options[opt]) {
             options[opt] = defaults[opt];
         }
