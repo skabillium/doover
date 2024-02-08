@@ -5,6 +5,8 @@ type RetryOptions = {
     onError?: (err: Error, attempt: number) => unknown;
 };
 
+type RetryFunction<T> = (bail: (e?: Error) => void) => Promise<T>;
+
 const waitFor = (milliseconds: number) =>
     new Promise((resolve) => setTimeout(resolve, milliseconds));
 
@@ -29,8 +31,8 @@ function loadOptions(options?: RetryOptions) {
     return options;
 }
 
-export default async function retry<T>(
-    operation: (bail?: (err?: Error) => void) => Promise<T>,
+export default function retry<T>(
+    operation: RetryFunction<T>,
     opts?: RetryOptions,
 ) {
     const options = loadOptions(opts);
@@ -45,29 +47,35 @@ export default async function retry<T>(
         return operation;
     }
 
-    while (attempts < maxAttempts) {
-        try {
-            const result = await operation();
-            return result;
-        } catch (err) {
-            returnError = err;
-            attempts++;
+    return new Promise(async (resolve, reject) => {
+        function bail(err?: Error) {
+            reject(err || new Error('Abort'));
+        }
 
-            if (options.onError) {
-                options.onError(err, attempts);
-            }
+        while (attempts < maxAttempts) {
+            try {
+                const result = await operation(bail);
+                return resolve(result);
+            } catch (err) {
+                returnError = err;
+                attempts++;
 
-            if (attempts < maxAttempts) {
-                if (delay > 0) {
-                    if (attempts !== 1) {
-                        delay = delay * options.factor;
+                if (options.onError) {
+                    options.onError(err, attempts);
+                }
+
+                if (attempts < maxAttempts) {
+                    if (delay > 0) {
+                        if (attempts !== 1) {
+                            delay = delay * options.factor;
+                        }
+
+                        await waitFor(delay);
                     }
-
-                    await waitFor(delay);
                 }
             }
         }
-    }
 
-    throw returnError;
+        reject(returnError);
+    });
 }
